@@ -30,7 +30,7 @@ struct ProfileEditorView: View {
             _name = State(initialValue: initialName ?? "")
             _color = State(initialValue: ProfileColor.automatic(for: initialName ?? UUID().uuidString))
         case .edit(let profile):
-            _name = State(initialValue: profile.name)
+            _name = State(initialValue: initialName ?? profile.name)
             _color = State(initialValue: profile.color)
         }
     }

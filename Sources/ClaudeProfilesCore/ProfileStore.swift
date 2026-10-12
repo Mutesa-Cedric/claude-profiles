@@ -127,13 +127,17 @@ public final class ProfileStore {
         try update(profile.id) { $0.color = color }
     }
 
-    /// Moves the profile's folder to the Trash. Signs that account out as far as this Mac is concerned.
-    public func trash(_ profile: Profile) throws {
+    /// Moves the profile's folder to the Trash and returns where it landed. Signs that account
+    /// out as far as this Mac is concerned.
+    @discardableResult
+    public func trash(_ profile: Profile) throws -> URL {
         guard let directory = profile.dataDirectory else { throw ProfileStoreError.notCustomizable }
-        try fileManager.trashItem(at: directory, resultingItemURL: nil)
+        var trashed: NSURL?
+        try fileManager.trashItem(at: directory, resultingItemURL: &trashed)
         var metadata = loadMetadata()
         metadata.removeValue(forKey: profile.id)
         try saveMetadata(metadata)
+        return (trashed as URL?) ?? directory
     }
 
     // MARK: Metadata file

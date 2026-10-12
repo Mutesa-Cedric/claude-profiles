@@ -7,7 +7,7 @@ VERSION     ?= $(shell tag=$$(git describe --tags --abbrev=0 2>/dev/null); echo 
 BUILD       ?= $(shell git rev-list --count HEAD 2>/dev/null || echo 1)
 ARCHS       := --arch arm64 --arch x86_64
 
-.PHONY: all build test app install run screenshots icon release clean
+.PHONY: all build test app install run selftest screenshots icon release clean
 
 all: app
 
@@ -44,6 +44,11 @@ install: app
 run: app
 	-pkill -x $(EXECUTABLE)
 	open "$(APP)"
+
+## Drive the installed app end to end against the real Claude (launches and quits one instance)
+selftest: install
+	sleep 1
+	"$(INSTALL_DIR)/$(APP_NAME).app/Contents/MacOS/$(EXECUTABLE)" --self-test $(BUILD_DIR)/selftest
 
 ## Regenerate the README screenshots from the real UI with demo data
 screenshots: app

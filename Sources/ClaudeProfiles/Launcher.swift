@@ -48,7 +48,8 @@ class Launcher {
     /// Brings the profile's window forward if it's already open, otherwise launches it.
     func open(_ profile: Profile, running: [Profile.ID: pid_t], completion: @escaping (Error?) -> Void) {
         if let pid = running[profile.id], let app = NSRunningApplication(processIdentifier: pid) {
-            app.activate(options: [.activateAllWindows])
+            // Hand our activation over to Claude; the user just clicked us, so this is allowed.
+            app.activate(from: .current, options: [.activateAllWindows])
             completion(nil)
             return
         }

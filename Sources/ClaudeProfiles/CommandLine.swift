@@ -25,6 +25,8 @@ enum CommandLineMode {
               (no arguments)   start the menu bar app
               --list           print profiles and their state
               --open <name>    open or focus a profile by name
+              --self-test <dir>  drive the real UI end to end (needs Claude installed)
+              --capture <dir>    render README screenshots with demo data
             """)
             exit(0)
         default:

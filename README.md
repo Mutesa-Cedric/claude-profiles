@@ -137,12 +137,15 @@ Running profiles are detected by reading the process table and matching that fla
 make build        # debug build
 make test         # unit tests for the core module
 make run          # bundle and launch
+make selftest     # install, then drive the real UI end to end against Claude (launches and quits one instance)
 make screenshots  # regenerate docs/screenshots from the real UI with demo data
 make icon         # regenerate the app icon from Scripts/make-icon.swift
 make release      # zip the app for a GitHub release
 ```
 
 The package has two targets: `ClaudeProfilesCore` (profile discovery, metadata, process detection; no AppKit, fully unit-tested) and `ClaudeProfiles` (the AppKit + SwiftUI app). Releases are built and published by GitHub Actions when a `v*` tag is pushed.
+
+`make selftest` is the integration test: it creates a profile in a temp folder through the real New Profile window, waits for Claude to launch, presses the real buttons in the Manage window, renames, quits, trashes, and toggles Launch at Login (restoring it). Buttons are pressed through the app's own accessibility tree, so no extra permissions are needed, and your actual profiles are never touched.
 
 ## License
 

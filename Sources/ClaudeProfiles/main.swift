@@ -11,6 +11,11 @@ MainActor.assumeIsolated {
         let delegate = ScreenshotDelegate(outputDirectory: URL(fileURLWithPath: arguments[flag + 1]))
         app.delegate = delegate
         app.run()
+    } else if let flag = arguments.firstIndex(of: "--self-test"), arguments.indices.contains(flag + 1) {
+        // Drives the real UI against a real Claude install; see SelfTest.swift.
+        let delegate = SelfTestDelegate(outputDirectory: URL(fileURLWithPath: arguments[flag + 1]))
+        app.delegate = delegate
+        app.run()
     } else if CommandLineMode.run(arguments) {
         // Handled headlessly; `run` exits when done.
     } else {
