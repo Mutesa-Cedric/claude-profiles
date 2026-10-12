@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Build app bundle
+        run: make app
+
+      - name: Verify bundle
+        run: |
+          codesign --verify --verbose "build/Claude Profiles.app"
+          lipo -info "build/Claude Profiles.app/Contents/MacOS/ClaudeProfiles"
+          "build/Claude Profiles.app/Contents/MacOS/ClaudeProfiles" --help
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claude-Profiles-${{ github.sha }}
+          path: build/Claude Profiles.app
+          if-no-files-found: error
