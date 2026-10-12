@@ -72,7 +72,7 @@ private struct ProfileRow: View {
     /// "Show in Finder" is one click away.
     private var subtitle: String {
         guard let directory = profile.dataDirectory else { return "Claude's own data folder" }
-        return directory.lastPathComponent
+        return profile.hasOwnDockIcon ? "\(directory.lastPathComponent) · own Dock icon" : directory.lastPathComponent
     }
 
     var body: some View {
@@ -112,6 +112,12 @@ private struct ProfileRow: View {
                             set: { if $0 { model.setColor(candidate, for: profile) } }
                         ))
                     }
+                }
+                if !profile.isDefault {
+                    Toggle("Separate Dock Icon", isOn: Binding(
+                        get: { profile.hasOwnDockIcon },
+                        set: { model.setOwnDockIcon($0, for: profile) }
+                    ))
                 }
                 Divider()
                 if !profile.isDefault {

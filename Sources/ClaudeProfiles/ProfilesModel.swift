@@ -27,6 +27,7 @@ final class ProfilesModel: ObservableObject {
     func refresh() {
         profiles = store.profiles()
         running = launcher.runningInstances(for: profiles)
+        launcher.profileApps.removeOrphans(keeping: profiles)
     }
 
     /// Launching takes a moment to show up in the process table; check again shortly.
@@ -68,9 +69,9 @@ final class ProfilesModel: ObservableObject {
     }
 
     @discardableResult
-    func create(name: String, color: ProfileColor) -> Profile? {
+    func create(name: String, color: ProfileColor, ownDockIcon: Bool = false) -> Profile? {
         do {
-            let profile = try store.createProfile(named: name, color: color)
+            let profile = try store.createProfile(named: name, color: color, ownDockIcon: ownDockIcon)
             refresh()
             return profile
         } catch {
@@ -79,10 +80,17 @@ final class ProfilesModel: ObservableObject {
         }
     }
 
-    func update(_ profile: Profile, name: String, color: ProfileColor) {
+    /// Applies only the fields given, comparing against what's stored now rather than the
+    /// struct the caller holds, which may be stale.
+    func update(_ profile: Profile, name: String? = nil, color: ProfileColor? = nil, ownDockIcon: Bool? = nil) {
+        let current = profiles.first { $0.id == profile.id } ?? profile
         do {
-            if name != profile.name { try store.rename(profile, to: name) }
-            if color != profile.color { try store.setColor(color, for: profile) }
+            if let name, name != current.name { try store.rename(current, to: name) }
+            if let color, color != current.color { try store.setColor(color, for: current) }
+            if let ownDockIcon, ownDockIcon != current.hasOwnDockIcon, !current.isDefault {
+                try store.setOwnDockIcon(ownDockIcon, for: current)
+            }
+            // A renamed or switched-off profile leaves its old copy behind; refresh clears it.
             refresh()
         } catch {
             present(error)
@@ -90,12 +98,17 @@ final class ProfilesModel: ObservableObject {
     }
 
     func setColor(_ color: ProfileColor, for profile: Profile) {
-        update(profile, name: profile.name, color: color)
+        update(profile, color: color)
+    }
+
+    func setOwnDockIcon(_ enabled: Bool, for profile: Profile) {
+        update(profile, ownDockIcon: enabled)
     }
 
     func trash(_ profile: Profile) {
         do {
             try store.trash(profile)
+            try? launcher.profileApps.remove(for: profile)
             refresh()
         } catch {
             present(error)

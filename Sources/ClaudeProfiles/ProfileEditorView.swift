@@ -8,18 +8,25 @@ struct ProfileEditorView: View {
         case edit(Profile)
     }
 
+    struct Result {
+        var name: String
+        var color: ProfileColor
+        var ownDockIcon: Bool
+    }
+
     let mode: Mode
-    let onSave: (String, ProfileColor) -> Void
+    let onSave: (Result) -> Void
     let onCancel: () -> Void
 
     @State private var name: String
     @State private var color: ProfileColor
+    @State private var ownDockIcon: Bool
     @FocusState private var nameFocused: Bool
 
     init(
         mode: Mode,
         initialName: String? = nil,
-        onSave: @escaping (String, ProfileColor) -> Void,
+        onSave: @escaping (Result) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.mode = mode
@@ -29,9 +36,11 @@ struct ProfileEditorView: View {
         case .create:
             _name = State(initialValue: initialName ?? "")
             _color = State(initialValue: ProfileColor.automatic(for: initialName ?? UUID().uuidString))
+            _ownDockIcon = State(initialValue: false)
         case .edit(let profile):
             _name = State(initialValue: initialName ?? profile.name)
             _color = State(initialValue: profile.color)
+            _ownDockIcon = State(initialValue: profile.hasOwnDockIcon)
         }
     }
 
@@ -40,9 +49,19 @@ struct ProfileEditorView: View {
         return false
     }
 
+    /// The stock profile is Claude.app itself, so it can't get a separate Dock icon.
+    private var canHaveOwnDockIcon: Bool {
+        if case .edit(let profile) = mode { return !profile.isDefault }
+        return true
+    }
+
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isValid: Bool { ProfileSlug.make(from: trimmedName) != nil }
     private var initial: String { trimmedName.first.map { String($0).uppercased() } ?? "?" }
+
+    private func save() {
+        onSave(Result(name: trimmedName, color: color, ownDockIcon: ownDockIcon))
+    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -56,7 +75,7 @@ struct ProfileEditorView: View {
                 TextField("", text: $name, prompt: Text(isCreate ? "Work" : "Name"))
                     .textFieldStyle(.roundedBorder)
                     .focused($nameFocused)
-                    .onSubmit { if isValid { onSave(trimmedName, color) } }
+                    .onSubmit { if isValid { save() } }
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -73,6 +92,19 @@ struct ProfileEditorView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            if canHaveOwnDockIcon {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Separate Dock icon", isOn: $ownDockIcon)
+                        .toggleStyle(.checkbox)
+                    Text("Shows this profile's badge on its own Dock and ⌘-Tab tile, using a lightweight copy of Claude in ~/Applications/Claude Profiles.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 20)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if isCreate {
                 Text("A fresh Claude window opens so you can sign in to the account for this profile.")
                     .font(.caption)
@@ -85,7 +117,7 @@ struct ProfileEditorView: View {
                 Spacer()
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(isCreate ? "Create & Open" : "Save") { onSave(trimmedName, color) }
+                Button(isCreate ? "Create & Open" : "Save", action: save)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(!isValid)

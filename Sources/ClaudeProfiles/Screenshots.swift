@@ -43,7 +43,8 @@ final class ScreenshotDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func capture(store: ProfileStore, suffix: String) throws {
-        let model = ProfilesModel(store: store, launcher: DemoLauncher())
+        let demoApps = ProfileApps(directory: store.supportDirectory.appendingPathComponent("Apps"))
+        let model = ProfilesModel(store: store, launcher: DemoLauncher(profileApps: demoApps))
         let windows = WindowManager(model: model)
         let menuController = MenuController(model: model, windows: windows)
         keep += [model, windows, menuController]

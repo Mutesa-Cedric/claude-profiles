@@ -34,6 +34,7 @@ Claude is an Electron app, and Electron keeps one process per data folder. Give 
 - **One click per account.** Pick a profile from the menu bar (or press ⌘1…⌘9 while it's open). If that profile is already running, its window comes forward instead of opening twice.
 - **Profiles stay signed in.** Each one keeps its own login, settings, MCP servers and connectors.
 - **A proper management window.** Rename, recolor, reveal in Finder, quit, or delete a profile. Deleting moves the folder to the Trash so you can undo it.
+- **Separate Dock icons**, optionally. A profile can get its own badged tile in the Dock and ⌘-Tab instead of blending into the main Claude tile. See [below](#separate-dock-icons).
 - **Launch at Login** so the menu bar item is always there.
 - **Scriptable.** `--open <name>` and `--list` work from the shell, Raycast, Alfred or a Shortcut.
 - **Nothing phones home**, nothing is injected into Claude, and Claude's own folders are never modified. The app only passes a launch flag.
@@ -103,6 +104,19 @@ alias claude-profile='"$HOME/Applications/Claude Profiles.app/Contents/MacOS/Cla
 claude-profile Work
 ```
 
+## Separate Dock icons
+
+By default every profile shares Claude's Dock icon, because they all run from the same `Claude.app`. Turn on **Separate Dock icon** for a profile (in the New Profile window, or from the **⋯** menu in Manage Profiles) and it gets its own tile in the Dock and ⌘-Tab: Claude's icon with the profile's colored initial, labelled “Claude · Work”.
+
+Under the hood the profile launches through a per-profile copy of Claude at `~/Applications/Claude Profiles/Claude · Work.app`. The copy is an APFS clone, so it's instant and takes no extra space, and nothing inside it is modified — only a Finder custom icon is attached — so it launches exactly like the original. (Gatekeeper re-checks a copied app's signature on first launch and would reject any edited file inside it as “damaged”, which is why the name comes from the copy's file name rather than from its Info.plist.)
+
+Worth knowing:
+
+- The window title and the app menu still say “Claude”; Claude sets those itself.
+- When Claude updates, a copy becomes stale and holds its own ~650 MB until it's refreshed. Claude Profiles refreshes it automatically the next time you open that profile (as long as it isn't running).
+- A running copy may also download the update itself, like any Claude install.
+- Switching the option off, renaming the profile, or deleting it removes the copy. Copies are only ever deleted when they aren't running.
+
 ## How it works
 
 A profile is a folder next to Claude's own data folder:
@@ -127,7 +141,7 @@ Running profiles are detected by reading the process table and matching that fla
 ## Caveats
 
 - **Unofficial.** This relies on Claude being an Electron app that honors `--user-data-dir`. An update could change that, in which case profiles would open the default account until this app is updated.
-- **One Dock icon.** All instances are the same Claude.app, so they share a Dock icon and a ⌘-Tab entry. The menu marks running profiles with a checkmark and brings the right window forward.
+- **One Dock icon by default.** Profiles without the *Separate Dock icon* option share Claude's Dock tile and ⌘-Tab entry. The menu marks running profiles with a checkmark and brings the right window forward.
 - **Features tied to the system** such as the global shortcut or `claude://` links go to whichever instance registered them, usually the first one started.
 - **Launch at Login** needs the app to live in `~/Applications` or `/Applications`.
 

@@ -43,16 +43,18 @@ final class WindowManager {
         let view = ProfileEditorView(
             mode: mode,
             initialName: initialName,
-            onSave: { [weak self] name, color in
+            onSave: { [weak self] result in
                 guard let self else { return }
                 switch mode {
                 case .create:
-                    if let profile = self.model.create(name: name, color: color) {
+                    if let profile = self.model.create(
+                        name: result.name, color: result.color, ownDockIcon: result.ownDockIcon) {
                         self.closeEditor()
                         self.model.open(profile)
                     }
                 case .edit(let profile):
-                    self.model.update(profile, name: name, color: color)
+                    self.model.update(
+                        profile, name: result.name, color: result.color, ownDockIcon: result.ownDockIcon)
                     self.closeEditor()
                 }
             },

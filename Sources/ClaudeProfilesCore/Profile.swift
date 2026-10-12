@@ -25,12 +25,15 @@ public struct Profile: Hashable, Identifiable, Sendable {
     public var name: String
     public var color: ProfileColor
     public let dataDirectory: URL?
+    /// Launch through a per-profile copy of Claude.app so the Dock shows its own icon and name.
+    public var hasOwnDockIcon: Bool
 
-    public init(id: String, name: String, color: ProfileColor, dataDirectory: URL?) {
+    public init(id: String, name: String, color: ProfileColor, dataDirectory: URL?, hasOwnDockIcon: Bool = false) {
         self.id = id
         self.name = name
         self.color = color
         self.dataDirectory = dataDirectory
+        self.hasOwnDockIcon = hasOwnDockIcon
     }
 
     public var isDefault: Bool { dataDirectory == nil }

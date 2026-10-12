@@ -37,6 +37,19 @@ final class ProcessScannerTests: XCTestCase {
         XCTAssertEqual(ProcessScanner.parse(psOutput: output, executablePath: exe), [])
     }
 
+    func testAcceptsPerProfileCopiesOnlyWithADataDir() {
+        let copy = "/Users/me/Applications/Claude Profiles/Claude · Work.app/Contents/MacOS/Claude"
+        let dir = "/Users/me/Library/Application Support/Claude-Work"
+        let output = """
+        10 \(copy) --user-data-dir=\(dir)
+        11 \(copy)
+        12 /Applications/Other.app/Contents/MacOS/Claude Helper --user-data-dir=\(dir)
+        """
+        let found = ProcessScanner.parse(psOutput: output, executablePath: exe)
+        XCTAssertEqual(found.map(\.pid), [10], "a copy without a data dir would be the stock login; a Helper never matches")
+        XCTAssertEqual(found.first?.dataDirectory?.path, dir)
+    }
+
     func testKeepsOnlyTheMainProcessPerDataDir() {
         let dir = "/Users/me/Library/Application Support/Claude-Work"
         let output = """

@@ -95,6 +95,22 @@ final class ProfileStoreTests: XCTestCase {
         }
     }
 
+    func testOwnDockIconFlagIsStoredPerProfile() throws {
+        let plain = try store.createProfile(named: "Plain")
+        let docked = try store.createProfile(named: "Docked", ownDockIcon: true)
+        XCTAssertFalse(plain.hasOwnDockIcon)
+        XCTAssertTrue(docked.hasOwnDockIcon)
+        XCTAssertEqual(store.profiles().map(\.hasOwnDockIcon), [false, true, false])
+
+        try store.setOwnDockIcon(true, for: plain)
+        try store.setOwnDockIcon(false, for: docked)
+        XCTAssertEqual(store.profiles().map(\.hasOwnDockIcon), [false, false, true])
+
+        XCTAssertThrowsError(try store.setOwnDockIcon(true, for: store.profiles()[0])) {
+            XCTAssertEqual($0 as? ProfileStoreError, .notCustomizable)
+        }
+    }
+
     func testDefaultProfileCanBeRelabelledButNotTrashed() throws {
         let stock = store.profiles()[0]
         try store.rename(stock, to: "Personal")

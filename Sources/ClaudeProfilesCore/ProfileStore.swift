@@ -76,7 +76,8 @@ public final class ProfileStore {
                 id: folder,
                 name: entry?.name ?? ProfileSlug.displayName(fromFolderSuffix: suffix),
                 color: entry?.color ?? ProfileColor.automatic(for: folder),
-                dataDirectory: url.standardizedFileURL
+                dataDirectory: url.standardizedFileURL,
+                hasOwnDockIcon: entry?.dockIcon ?? false
             )
         }
         .sorted { a, b in
@@ -97,7 +98,7 @@ public final class ProfileStore {
     // MARK: Writing
 
     @discardableResult
-    public func createProfile(named rawName: String, color: ProfileColor? = nil) throws -> Profile {
+    public func createProfile(named rawName: String, color: ProfileColor? = nil, ownDockIcon: Bool = false) throws -> Profile {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let slug = ProfileSlug.make(from: name) else { throw ProfileStoreError.invalidName }
 
@@ -110,10 +111,12 @@ public final class ProfileStore {
 
         let chosen = color ?? ProfileColor.automatic(for: folder)
         var metadata = loadMetadata()
-        metadata[folder] = Metadata(name: name, color: chosen)
+        metadata[folder] = Metadata(name: name, color: chosen, dockIcon: ownDockIcon ? true : nil)
         try saveMetadata(metadata)
 
-        return Profile(id: folder, name: name, color: chosen, dataDirectory: directory.standardizedFileURL)
+        return Profile(
+            id: folder, name: name, color: chosen,
+            dataDirectory: directory.standardizedFileURL, hasOwnDockIcon: ownDockIcon)
     }
 
     /// Changes the display name only; the folder on disk keeps its name so Claude is never disturbed.
@@ -125,6 +128,11 @@ public final class ProfileStore {
 
     public func setColor(_ color: ProfileColor, for profile: Profile) throws {
         try update(profile.id) { $0.color = color }
+    }
+
+    public func setOwnDockIcon(_ enabled: Bool, for profile: Profile) throws {
+        guard !profile.isDefault else { throw ProfileStoreError.notCustomizable }
+        try update(profile.id) { $0.dockIcon = enabled ? true : nil }
     }
 
     /// Moves the profile's folder to the Trash and returns where it landed. Signs that account
@@ -145,6 +153,7 @@ public final class ProfileStore {
     private struct Metadata: Codable {
         var name: String?
         var color: ProfileColor?
+        var dockIcon: Bool?
     }
 
     private func loadMetadata() -> [String: Metadata] {

@@ -49,14 +49,18 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
     // MARK: Scenario
 
     private func run() async throws {
-        let launcher = Launcher()
-        guard launcher.isClaudeInstalled else { throw SelfTestError("Claude for Mac is not installed") }
-
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("claude-profiles-selftest-\(UUID().uuidString)", isDirectory: true)
         let support = root.appendingPathComponent("Application Support", isDirectory: true)
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
+
+        // Copies go in a sub-folder of the real location so they behave like the real thing,
+        // while orphan cleanup (which only scans its own folder) can't touch real copies.
+        let copies = ProfileApps.defaultDirectory.appendingPathComponent("Self Test", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: copies) }
+        let launcher = Launcher(profileApps: ProfileApps(directory: copies))
+        guard launcher.isClaudeInstalled else { throw SelfTestError("Claude for Mac is not installed") }
 
         let store = ProfileStore(supportDirectory: support, metadataURL: root.appendingPathComponent("profiles.json"))
         let model = ProfilesModel(store: store, launcher: launcher)
@@ -144,6 +148,50 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
         await settle(1)
         try capture(manage, "4-manage-stopped")
         check("manage window offers Open again", buttons(in: manage, after: "Self Test Renamed").contains("Open"))
+
+        // 5. Separate Dock icon: the profile launches through its own copy of Claude
+        model.setOwnDockIcon(true, for: created)
+        let docked = try require(model.profiles.first { $0.id == created.id && $0.hasOwnDockIcon },
+                                 "Dock icon option is stored")
+        model.open(docked)
+        try await waitUntil("Claude launches through the profile's copy", timeout: 60) {
+            model.refresh()
+            return model.isRunning(docked)
+        }
+        let copy = launcher.profileApps.url(for: docked)
+        check("copy exists in the profile apps folder", FileManager.default.fileExists(atPath: copy.path))
+        if let pid = model.running[docked.id], let app = NSRunningApplication(processIdentifier: pid) {
+            check("instance runs from the copy",
+                  app.bundleURL?.standardizedFileURL.path == copy.standardizedFileURL.path)
+            let name = app.localizedName ?? ""
+            print("info  the copy is listed as “\(name)”")
+            check("instance is named Claude or after its file",
+                  name == "Claude" || name == copy.deletingPathExtension().lastPathComponent)
+            let claudeIcon = NSWorkspace.shared.icon(forFile: launcher.appURL!.path).tiffRepresentation
+            check("instance has its own icon", app.icon?.tiffRepresentation != claudeIcon)
+        } else {
+            fail("running instance not found for the copy")
+        }
+        await settle(1)
+        try capture(manage, "5-manage-dock-icon")
+        if let claudeApp = launcher.appURL,
+           let png = DockIconComposer
+               .compose(base: NSWorkspace.shared.icon(forFile: claudeApp.path), profile: docked, size: 256)
+               .tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0) })?
+               .representation(using: .png, properties: [:]) {
+            try png.write(to: outputDirectory.appendingPathComponent("6-dock-icon.png"))
+        }
+        model.quit(docked)
+        try await waitUntil("the copy quits", timeout: 30) {
+            model.refresh()
+            return !model.isRunning(docked)
+        }
+        model.setOwnDockIcon(false, for: docked)
+        for _ in 0..<10 where FileManager.default.fileExists(atPath: copy.path) {
+            await settle(0.5)
+            model.refresh()
+        }
+        check("copy is removed when the option is switched off", !FileManager.default.fileExists(atPath: copy.path))
         manage.close()
 
         let trashed = try store.trash(created)

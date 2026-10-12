@@ -14,9 +14,19 @@ class Launcher {
     static let bundleIdentifier = "com.anthropic.claudefordesktop"
     static let downloadURL = URL(string: "https://claude.ai/download")!
 
+    let profileApps: ProfileApps
+
+    init(profileApps: ProfileApps = ProfileApps()) {
+        self.profileApps = profileApps
+    }
+
+    /// The real Claude.app. Per-profile copies share its bundle identifier, so they're skipped.
     var appURL: URL? {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.bundleIdentifier) {
-            return url
+        let copies = profileApps.directory.standardizedFileURL.path
+        let candidates = NSWorkspace.shared.urlsForApplications(withBundleIdentifier: Self.bundleIdentifier)
+            .filter { !$0.standardizedFileURL.path.hasPrefix(copies + "/") }
+        if let preferred = candidates.first(where: { $0.path == "/Applications/Claude.app" }) ?? candidates.first {
+            return preferred
         }
         let fallback = URL(fileURLWithPath: "/Applications/Claude.app")
         return FileManager.default.fileExists(atPath: fallback.path) ? fallback : nil
@@ -53,22 +63,38 @@ class Launcher {
             completion(nil)
             return
         }
-        guard let appURL else {
+        guard let claudeApp = appURL else {
             completion(LauncherError.claudeNotInstalled)
             return
         }
 
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = true
-        // Electron keeps one process per data folder, so a profile always needs its own
-        // instance. The stock folder only needs a new one when another instance already
-        // owns the app; otherwise a plain open would just focus whatever is running.
-        configuration.createsNewApplicationInstance = profile.dataDirectory != nil || !running.isEmpty
-        if let directory = profile.dataDirectory {
-            configuration.arguments = ["--user-data-dir=\(directory.path)"]
+        let launch = { (app: URL) in
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            // Electron keeps one process per data folder, so a profile always needs its own
+            // instance. The stock folder only needs a new one when another instance already
+            // owns the app; otherwise a plain open would just focus whatever is running.
+            configuration.createsNewApplicationInstance = profile.dataDirectory != nil || !running.isEmpty
+            if let directory = profile.dataDirectory {
+                configuration.arguments = ["--user-data-dir=\(directory.path)"]
+            }
+            NSWorkspace.shared.openApplication(at: app, configuration: configuration) { _, error in
+                DispatchQueue.main.async { completion(error) }
+            }
         }
-        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
-            DispatchQueue.main.async { completion(error) }
+
+        guard profile.hasOwnDockIcon, profile.dataDirectory != nil else {
+            launch(claudeApp)
+            return
+        }
+        // Cloning takes about a second the first time; keep the menu responsive.
+        DispatchQueue.global(qos: .userInitiated).async { [profileApps] in
+            do {
+                let app = try profileApps.app(for: profile, claudeApp: claudeApp)
+                DispatchQueue.main.async { launch(app) }
+            } catch {
+                DispatchQueue.main.async { completion(error) }
+            }
         }
     }
 
