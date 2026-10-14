@@ -104,6 +104,17 @@ alias claude-profile='"$HOME/Applications/Claude Profiles.app/Contents/MacOS/Cla
 claude-profile Work
 ```
 
+## Signing in to a profile
+
+Claude signs in through your browser and comes back to the app through a `claude://` link. macOS delivers that link to whichever running Claude instance it picks — in testing, reliably *not* the window you started from. With two profiles open, a login started in Personal can land in Default, both end up on the same account, and a later logout in one takes the other down with it.
+
+Claude Profiles guards against this:
+
+- **Create & Open** and **⋯ → Sign In…** check whether other profiles are open. If so, they offer to quit them for the duration of the sign-in, so the link has exactly one place to go.
+- Afterwards, a **Reopen …** item at the top of the menu (and a button in Manage Profiles) brings the quit profiles back.
+
+If your profiles are already mixed up: for each one, choose **⋯ → Sign In…**, accept the prompt, log out inside that window, and log in with the account you want. Then reopen the rest.
+
 ## Separate Dock icons
 
 By default every profile shares Claude's Dock icon, because they all run from the same `Claude.app`. Turn on **Separate Dock icon** for a profile (in the New Profile window, or from the **⋯** menu in Manage Profiles) and it gets its own tile in the Dock and ⌘-Tab: Claude's icon with the profile's colored initial, labelled “Claude · Work”.
@@ -142,7 +153,7 @@ Running profiles are detected by reading the process table and matching that fla
 
 - **Unofficial.** This relies on Claude being an Electron app that honors `--user-data-dir`. An update could change that, in which case profiles would open the default account until this app is updated.
 - **One Dock icon by default.** Profiles without the *Separate Dock icon* option share Claude's Dock tile and ⌘-Tab entry. The menu marks running profiles with a checkmark and brings the right window forward.
-- **Features tied to the system** such as the global shortcut or `claude://` links go to whichever instance registered them, usually the first one started.
+- **Features tied to the system** such as the global shortcut or `claude://` links go to whichever instance macOS picks. For sign-in links the app works around this (see [Signing in](#signing-in-to-a-profile)); other deep links may still open in a different profile than you expect.
 - **Launch at Login** needs the app to live in `~/Applications` or `/Applications`.
 
 ## Development

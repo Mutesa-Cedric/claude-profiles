@@ -50,7 +50,8 @@ final class WindowManager {
                     if let profile = self.model.create(
                         name: result.name, color: result.color, ownDockIcon: result.ownDockIcon) {
                         self.closeEditor()
-                        self.model.open(profile)
+                        // A new profile's first act is signing in, which needs the guard below.
+                        self.confirmSignIn(for: profile)
                     }
                 case .edit(let profile):
                     self.model.update(
@@ -86,6 +87,48 @@ final class WindowManager {
     private func closeEditor() {
         editorWindow?.close()
         editorWindow = nil
+    }
+
+    enum SignInChoice {
+        case quitOthers, openAnyway, cancel
+    }
+
+    /// Replaces the sign-in alert; the self-test uses it so no real window gets quit.
+    var signInPrompt: ((Profile, [Profile]) -> SignInChoice)?
+
+    /// Opens a profile to sign in. When other profiles are open, offers to quit them first so
+    /// the browser's sign-in link can only come back to this one (see `ProfilesModel.signIn`).
+    func confirmSignIn(for profile: Profile) {
+        model.refresh()
+        let others = model.otherRunningProfiles(than: profile)
+        guard !others.isEmpty else {
+            model.open(profile)
+            return
+        }
+        switch signInPrompt?(profile, others) ?? askAboutSignIn(for: profile, others: others) {
+        case .quitOthers:
+            model.signIn(profile, quittingOthers: true)
+        case .openAnyway:
+            model.open(profile)
+        case .cancel:
+            break
+        }
+    }
+
+    private func askAboutSignIn(for profile: Profile, others: [Profile]) -> SignInChoice {
+        let names = others.map { "“\($0.name)”" }.formatted(.list(type: .and))
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = "Quit \(names) while you sign in to “\(profile.name)”?"
+        alert.informativeText = "Claude signs in through your browser and comes back through a link that macOS hands to whichever Claude window it picks. With other profiles open, the login can land in the wrong one. Quitting them for a moment makes sure it reaches “\(profile.name)”; you can reopen them from the menu afterwards."
+        alert.addButton(withTitle: "Quit Others & Open")
+        alert.addButton(withTitle: "Open Anyway")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .quitOthers
+        case .alertSecondButtonReturn: return .openAnyway
+        default: return .cancel
+        }
     }
 
     private func present(_ window: NSWindow) {

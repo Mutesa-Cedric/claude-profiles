@@ -31,6 +31,12 @@ struct ManageProfilesView: View {
                     Label("New Profile", systemImage: "plus")
                 }
                 .keyboardShortcut("n")
+                if !model.pausedForSignIn.isEmpty {
+                    Button("Reopen \(model.pausedForSignIn.map(\.name).formatted(.list(type: .and)))") {
+                        model.reopenPaused()
+                    }
+                    .help("These were quit so another profile could sign in.")
+                }
                 Spacer()
                 Text("Profiles are folders in ~/Library/Application Support")
                     .font(.caption)
@@ -104,6 +110,8 @@ private struct ProfileRow: View {
                 .controlSize(.small)
 
             Menu {
+                Button("Sign In…") { windows.confirmSignIn(for: profile) }
+                Divider()
                 Button("Rename…") { windows.showEditor(.edit(profile)) }
                 Menu("Color") {
                     ForEach(ProfileColor.allCases, id: \.self) { candidate in

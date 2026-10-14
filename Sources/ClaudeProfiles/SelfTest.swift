@@ -67,6 +67,15 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
         let windows = WindowManager(model: model)
         let menuController = MenuController(model: model, windows: windows)
 
+        // The sign-in guard would show a modal alert whenever another Claude window is open
+        // (the user's Default usually is). Answer it here, choosing to open without quitting
+        // anything, and remember what it was asked about.
+        var guardAskedAbout: [Profile]?
+        windows.signInPrompt = { _, others in
+            guardAskedAbout = others
+            return .openAnyway
+        }
+
         // 1. New Profile window → Create & Open
         windows.showEditor(.create, initialName: "Self Test")
         await settle()
@@ -78,6 +87,12 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
         check("editor closes after Create & Open", windows.editorWindow == nil)
 
         let created = try require(model.profiles.first { $0.name == "Self Test" }, "profile appears in the model")
+        if let defaultProfile = model.profiles.first, model.isRunning(defaultProfile) {
+            check("Create & Open consults the sign-in guard about the open Default",
+                  guardAskedAbout?.map(\.id) == [Profile.defaultID])
+        } else {
+            check("Create & Open skips the sign-in guard when nothing else is open", guardAskedAbout == nil)
+        }
         check("profile folder was created", FileManager.default.fileExists(atPath: created.dataDirectory!.path))
         launched = (model, created)
         try await waitUntil("Claude launches for the new profile", timeout: 30) {
@@ -201,7 +216,38 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
         model.refresh()
         check("model forgets the profile", !model.profiles.contains { $0.id == created.id })
 
-        // 5. Launch at Login round trip (installed bundle only), restored afterwards
+        // 5. Sign-in guard: quits the other profiles, opens the target once they're gone, and
+        //    can bring them back. Uses a recording launcher so nothing real is quit.
+        do {
+            let recorder = RecordingLauncher(profileApps: launcher.profileApps)
+            let signInStore = ProfileStore(
+                supportDirectory: root.appendingPathComponent("SignIn/Application Support", isDirectory: true),
+                metadataURL: root.appendingPathComponent("SignIn/profiles.json"))
+            try FileManager.default.createDirectory(at: signInStore.supportDirectory, withIntermediateDirectories: true)
+            let alpha = try signInStore.createProfile(named: "Alpha")
+            let beta = try signInStore.createProfile(named: "Beta")
+            recorder.runningIDs = [Profile.defaultID, alpha.id]
+            let signInModel = ProfilesModel(store: signInStore, launcher: recorder)
+
+            check("sign-in sees the other open profiles",
+                  Set(signInModel.otherRunningProfiles(than: beta).map(\.id)) == [Profile.defaultID, alpha.id])
+            signInModel.signIn(beta, quittingOthers: true)
+            await settle(1.5)
+            check("sign-in quits the other profiles", Set(recorder.quitIDs) == [Profile.defaultID, alpha.id])
+            check("sign-in opens the target once they're gone", recorder.openedIDs == [beta.id])
+            check("quit profiles are remembered for reopening",
+                  Set(signInModel.pausedForSignIn.map(\.id)) == [Profile.defaultID, alpha.id])
+            signInModel.reopenPaused()
+            check("reopen brings them back", Set(recorder.openedIDs.dropFirst()) == [Profile.defaultID, alpha.id])
+            check("reopen clears the list", signInModel.pausedForSignIn.isEmpty)
+
+            recorder.openedIDs = []
+            signInModel.signIn(alpha, quittingOthers: false)
+            await settle(0.3)
+            check("Open Anyway just opens", recorder.openedIDs == [alpha.id] && signInModel.pausedForSignIn.isEmpty)
+        }
+
+        // 6. Launch at Login round trip (installed bundle only), restored afterwards
         if Bundle.main.bundleURL.pathExtension == "app" {
             let service = SMAppService.mainApp
             let original = service.status
@@ -402,6 +448,38 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
     private func fail(_ what: String) {
         failures.append(what)
         print("FAIL  \(what)")
+    }
+}
+
+/// Stands in for Claude: remembers what was opened and quit instead of touching real windows.
+private final class RecordingLauncher: Launcher {
+    var runningIDs: Set<Profile.ID> = []
+    var openedIDs: [Profile.ID] = []
+    var quitIDs: [Profile.ID] = []
+    private var pids: [Profile.ID: pid_t] = [:]
+
+    override var isClaudeInstalled: Bool { true }
+
+    override func runningInstances(for profiles: [Profile]) -> [Profile.ID: pid_t] {
+        var result: [Profile.ID: pid_t] = [:]
+        for profile in profiles where runningIDs.contains(profile.id) {
+            let pid = pids[profile.id] ?? pid_t(1000 + pids.count)
+            pids[profile.id] = pid
+            result[profile.id] = pid
+        }
+        return result
+    }
+
+    override func open(_ profile: Profile, running: [Profile.ID: pid_t], completion: @escaping (Error?) -> Void) {
+        openedIDs.append(profile.id)
+        runningIDs.insert(profile.id)
+        completion(nil)
+    }
+
+    override func quit(pid: pid_t) {
+        guard let id = pids.first(where: { $0.value == pid })?.key else { return }
+        quitIDs.append(id)
+        runningIDs.remove(id)
     }
 }
 

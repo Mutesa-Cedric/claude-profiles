@@ -9,6 +9,8 @@ final class ProfilesModel: ObservableObject {
     @Published private(set) var profiles: [Profile] = []
     @Published private(set) var running: [Profile.ID: pid_t] = [:]
     @Published var lastError: String?
+    /// Profiles that were quit to let another one sign in; offered for reopening afterwards.
+    @Published private(set) var pausedForSignIn: [Profile] = []
 
     let store: ProfileStore
     let launcher: Launcher
@@ -66,6 +68,57 @@ final class ProfilesModel: ObservableObject {
         guard let pid = running[profile.id] else { return }
         launcher.quit(pid: pid)
         refreshSoon()
+    }
+
+    // MARK: Signing in
+    //
+    // Claude signs in through the browser and comes back via a claude:// link. macOS hands
+    // that link to whichever running Claude instance it picks — not necessarily the window
+    // that started the sign-in — so with several profiles open the login can land in the
+    // wrong one. Quitting the others for the duration of the sign-in removes the ambiguity.
+
+    /// Profiles whose Claude windows are open, other than `profile`.
+    func otherRunningProfiles(than profile: Profile) -> [Profile] {
+        profiles.filter { $0.id != profile.id && isRunning($0) }
+    }
+
+    /// Opens `profile` for signing in, first quitting every other running profile when asked.
+    func signIn(_ profile: Profile, quittingOthers: Bool) {
+        guard quittingOthers else {
+            open(profile)
+            return
+        }
+        let others = otherRunningProfiles(than: profile)
+        pausedForSignIn = others
+        for other in others { quit(other) }
+        // Open only once they're gone, so the sign-in link has exactly one place to go.
+        waitUntilGone(others.map(\.id), deadline: Date(timeIntervalSinceNow: 15)) { [weak self] in
+            self?.open(profile)
+        }
+    }
+
+    /// Brings back the profiles that were quit for a sign-in.
+    func reopenPaused() {
+        let paused = pausedForSignIn
+        pausedForSignIn = []
+        refresh()
+        for profile in paused { open(profile) }
+    }
+
+    func forgetPaused() {
+        pausedForSignIn = []
+    }
+
+    private func waitUntilGone(_ ids: [Profile.ID], deadline: Date, then completion: @escaping () -> Void) {
+        let stillRunning = launcher.runningInstances(for: profiles).keys.contains { ids.contains($0) }
+        guard stillRunning, Date() < deadline else {
+            refresh()
+            completion()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.waitUntilGone(ids, deadline: deadline, then: completion)
+        }
     }
 
     @discardableResult

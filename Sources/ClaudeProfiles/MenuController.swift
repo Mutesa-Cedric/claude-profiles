@@ -33,6 +33,14 @@ final class MenuController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
+        if !model.pausedForSignIn.isEmpty {
+            let names = model.pausedForSignIn.map(\.name).formatted(.list(type: .and))
+            let reopen = item("Reopen \(names)", action: #selector(reopenPaused), key: "r")
+            reopen.toolTip = "These were quit so another profile could sign in."
+            menu.addItem(reopen)
+            menu.addItem(.separator())
+        }
+
         for (index, profile) in model.profiles.enumerated() {
             let running = model.isRunning(profile)
             let entry = item(profile.name, action: #selector(openProfile(_:)), key: index < 9 ? String(index + 1) : "")
@@ -77,6 +85,8 @@ final class MenuController: NSObject, NSMenuDelegate {
     }
 
     @objc private func newProfile() { windows.showEditor(.create) }
+
+    @objc private func reopenPaused() { model.reopenPaused() }
 
     @objc private func manageProfiles() { windows.showManage() }
 
