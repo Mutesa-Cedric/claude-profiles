@@ -95,16 +95,22 @@ final class ProfileStoreTests: XCTestCase {
         }
     }
 
-    func testOwnDockIconFlagIsStoredPerProfile() throws {
-        let plain = try store.createProfile(named: "Plain")
-        let docked = try store.createProfile(named: "Docked", ownDockIcon: true)
-        XCTAssertFalse(plain.hasOwnDockIcon)
+    func testOwnDockIconIsOnByDefaultAndStoredPerProfile() throws {
+        let docked = try store.createProfile(named: "Docked")
+        let plain = try store.createProfile(named: "Plain", ownDockIcon: false)
         XCTAssertTrue(docked.hasOwnDockIcon)
+        XCTAssertFalse(plain.hasOwnDockIcon)
+        // Listed: Default, Docked, Plain.
         XCTAssertEqual(store.profiles().map(\.hasOwnDockIcon), [false, true, false])
 
-        try store.setOwnDockIcon(true, for: plain)
         try store.setOwnDockIcon(false, for: docked)
+        try store.setOwnDockIcon(true, for: plain)
         XCTAssertEqual(store.profiles().map(\.hasOwnDockIcon), [false, false, true])
+
+        // A folder made by hand has no stored choice and follows the default.
+        try FileManager.default.createDirectory(
+            at: store.supportDirectory.appendingPathComponent("Claude-Handmade"), withIntermediateDirectories: false)
+        XCTAssertEqual(store.profiles().first { $0.id == "Claude-Handmade" }?.hasOwnDockIcon, true)
 
         XCTAssertThrowsError(try store.setOwnDockIcon(true, for: store.profiles()[0])) {
             XCTAssertEqual($0 as? ProfileStoreError, .notCustomizable)

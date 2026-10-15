@@ -77,7 +77,8 @@ public final class ProfileStore {
                 name: entry?.name ?? ProfileSlug.displayName(fromFolderSuffix: suffix),
                 color: entry?.color ?? ProfileColor.automatic(for: folder),
                 dataDirectory: url.standardizedFileURL,
-                hasOwnDockIcon: entry?.dockIcon ?? false
+                // On unless switched off: a profile is meant to look like its own app.
+                hasOwnDockIcon: entry?.dockIcon ?? true
             )
         }
         .sorted { a, b in
@@ -98,7 +99,7 @@ public final class ProfileStore {
     // MARK: Writing
 
     @discardableResult
-    public func createProfile(named rawName: String, color: ProfileColor? = nil, ownDockIcon: Bool = false) throws -> Profile {
+    public func createProfile(named rawName: String, color: ProfileColor? = nil, ownDockIcon: Bool = true) throws -> Profile {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let slug = ProfileSlug.make(from: name) else { throw ProfileStoreError.invalidName }
 
@@ -111,7 +112,7 @@ public final class ProfileStore {
 
         let chosen = color ?? ProfileColor.automatic(for: folder)
         var metadata = loadMetadata()
-        metadata[folder] = Metadata(name: name, color: chosen, dockIcon: ownDockIcon ? true : nil)
+        metadata[folder] = Metadata(name: name, color: chosen, dockIcon: ownDockIcon)
         try saveMetadata(metadata)
 
         return Profile(
@@ -132,7 +133,7 @@ public final class ProfileStore {
 
     public func setOwnDockIcon(_ enabled: Bool, for profile: Profile) throws {
         guard !profile.isDefault else { throw ProfileStoreError.notCustomizable }
-        try update(profile.id) { $0.dockIcon = enabled ? true : nil }
+        try update(profile.id) { $0.dockIcon = enabled }
     }
 
     /// Moves the profile's folder to the Trash and returns where it landed. Signs that account

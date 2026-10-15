@@ -36,7 +36,7 @@ struct ProfileEditorView: View {
         case .create:
             _name = State(initialValue: initialName ?? "")
             _color = State(initialValue: ProfileColor.automatic(for: initialName ?? UUID().uuidString))
-            _ownDockIcon = State(initialValue: false)
+            _ownDockIcon = State(initialValue: true)
         case .edit(let profile):
             _name = State(initialValue: initialName ?? profile.name)
             _color = State(initialValue: profile.color)

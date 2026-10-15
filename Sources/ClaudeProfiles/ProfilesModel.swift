@@ -122,7 +122,7 @@ final class ProfilesModel: ObservableObject {
     }
 
     @discardableResult
-    func create(name: String, color: ProfileColor, ownDockIcon: Bool = false) -> Profile? {
+    func create(name: String, color: ProfileColor, ownDockIcon: Bool = true) -> Profile? {
         do {
             let profile = try store.createProfile(named: name, color: color, ownDockIcon: ownDockIcon)
             refresh()

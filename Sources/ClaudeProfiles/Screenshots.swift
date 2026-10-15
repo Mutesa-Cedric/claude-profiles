@@ -172,8 +172,12 @@ enum MenuRenderer {
             menu.cancelTracking()
         }
         RunLoop.main.add(timer, forMode: .common)
+        // Pop up away from the pointer, otherwise the item under it renders highlighted.
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        menu.popUp(positioning: nil, at: NSPoint(x: screen.midX, y: screen.midY), in: nil)
+        let mouse = NSEvent.mouseLocation
+        let x = mouse.x < screen.midX ? screen.maxX - 320 : screen.minX + 40
+        let y = mouse.y < screen.midY ? screen.maxY - 40 : screen.minY + 560
+        menu.popUp(positioning: nil, at: NSPoint(x: x, y: y), in: nil)
         return result
     }
 }

@@ -34,7 +34,7 @@ Claude is an Electron app, and Electron keeps one process per data folder. Give 
 - **One click per account.** Pick a profile from the menu bar (or press ⌘1…⌘9 while it's open). If that profile is already running, its window comes forward instead of opening twice.
 - **Profiles stay signed in.** Each one keeps its own login, settings, MCP servers and connectors.
 - **A proper management window.** Rename, recolor, reveal in Finder, quit, or delete a profile. Deleting moves the folder to the Trash so you can undo it.
-- **Separate Dock icons**, optionally. A profile can get its own badged tile in the Dock and ⌘-Tab instead of blending into the main Claude tile. See [below](#separate-dock-icons).
+- **Separate Dock icons.** Each profile gets its own badged tile in the Dock and ⌘-Tab, named “Claude · Work”, instead of blending into the main Claude tile. On by default, switchable per profile. See [below](#separate-dock-icons).
 - **Launch at Login** so the menu bar item is always there.
 - **Scriptable.** `--open <name>` and `--list` work from the shell, Raycast, Alfred or a Shortcut.
 - **Nothing phones home**, nothing is injected into Claude, and Claude's own folders are never modified. The app only passes a launch flag.
@@ -117,7 +117,7 @@ If your profiles are already mixed up: for each one, choose **⋯ → Sign In…
 
 ## Separate Dock icons
 
-By default every profile shares Claude's Dock icon, because they all run from the same `Claude.app`. Turn on **Separate Dock icon** for a profile (in the New Profile window, or from the **⋯** menu in Manage Profiles) and it gets its own tile in the Dock and ⌘-Tab: Claude's icon with the profile's colored initial, labelled “Claude · Work”.
+Every profile gets its own tile in the Dock and ⌘-Tab: Claude's icon with the profile's colored initial, labelled “Claude · Work”. This is on by default; switch **Separate Dock icon** off for a profile (in the New Profile window, or from the **⋯** menu in Manage Profiles) and it runs from `Claude.app` itself and shares Claude's tile instead.
 
 Under the hood the profile launches through a per-profile copy of Claude at `~/Applications/Claude Profiles/Claude · Work.app`. The copy is an APFS clone, so it's instant and takes no extra space, and nothing inside it is modified — only a Finder custom icon is attached — so it launches exactly like the original. (Gatekeeper re-checks a copied app's signature on first launch and would reject any edited file inside it as “damaged”, which is why the name comes from the copy's file name rather than from its Info.plist.)
 
@@ -152,7 +152,7 @@ Running profiles are detected by reading the process table and matching that fla
 ## Caveats
 
 - **Unofficial.** This relies on Claude being an Electron app that honors `--user-data-dir`. An update could change that, in which case profiles would open the default account until this app is updated.
-- **One Dock icon by default.** Profiles without the *Separate Dock icon* option share Claude's Dock tile and ⌘-Tab entry. The menu marks running profiles with a checkmark and brings the right window forward.
+- **Shared Dock icon when the option is off.** A profile with *Separate Dock icon* switched off shares Claude's Dock tile and ⌘-Tab entry. The menu marks running profiles with a checkmark and brings the right window forward either way.
 - **Features tied to the system** such as the global shortcut or `claude://` links go to whichever instance macOS picks. For sign-in links the app works around this (see [Signing in](#signing-in-to-a-profile)); other deep links may still open in a different profile than you expect.
 - **Launch at Login** needs the app to live in `~/Applications` or `/Applications`.
 

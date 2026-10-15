@@ -112,8 +112,14 @@ final class SelfTestDelegate: NSObject, NSApplicationDelegate {
         // Only an active app may hand activation to another one; a process started from a
         // shell may never have been made active, in which case the hand-over is a no-op.
         if NSApp.isActive {
-            check("Claude is frontmost after Show",
-                  NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Launcher.bundleIdentifier)
+            // Activation hand-over is asynchronous; give it a few seconds.
+            var frontmost = NSWorkspace.shared.frontmostApplication
+            for _ in 0..<10 where frontmost?.processIdentifier != model.running[created.id] {
+                await settle(0.5)
+                frontmost = NSWorkspace.shared.frontmostApplication
+            }
+            print("info  frontmost after Show: pid \(frontmost?.processIdentifier ?? -1) (\(frontmost?.localizedName ?? "-")), expected pid \(model.running[created.id] ?? -1)")
+            check("Claude is frontmost after Show", frontmost?.processIdentifier == model.running[created.id])
         } else {
             print("skip: Claude is frontmost after Show (this process isn't active)")
         }

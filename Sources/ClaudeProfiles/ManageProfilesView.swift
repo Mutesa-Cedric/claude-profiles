@@ -75,10 +75,13 @@ private struct ProfileRow: View {
     let onDelete: () -> Void
 
     /// The folder name is enough here; the footer says where the folders live and
-    /// "Show in Finder" is one click away.
+    /// "Show in Finder" is one click away. A separate Dock icon is the norm, so only the
+    /// exception is called out.
     private var subtitle: String {
         guard let directory = profile.dataDirectory else { return "Claude's own data folder" }
-        return profile.hasOwnDockIcon ? "\(directory.lastPathComponent) · own Dock icon" : directory.lastPathComponent
+        return profile.hasOwnDockIcon
+            ? directory.lastPathComponent
+            : "\(directory.lastPathComponent) · shares Claude's Dock icon"
     }
 
     var body: some View {
